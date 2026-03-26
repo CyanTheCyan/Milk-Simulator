@@ -7,6 +7,23 @@
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 
+/* 💰 MONEY UI */
+@font-face {
+  font-family: comic;
+  src: url("COMIC.ttf");
+}
+
+#money {
+  position:absolute;
+  top:10px;
+  left:10px;
+  color:white;
+  font-family: comic;
+  font-size:40px;
+  z-index:10;
+}
+
+/* HEALTH BAR */
 #bar {
   position:absolute;
   bottom:20px;
@@ -20,22 +37,16 @@ body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
   height:100%;
   width:0%;
   background:lime;
-  transition: width 0.1s linear; /* extra smoothness */
 }
 
+/* FACTORY BUTTON */
 #arrow {
   position:absolute;
   right:20px;
   top:50%;
   font-size:40px;
   cursor:pointer;
-}
-
-#money {
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
+  z-index:10;
 }
 </style>
 
@@ -55,16 +66,20 @@ body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 <div id="bar"><div id="fill"></div></div>
 <div id="arrow">➡️</div>
 
+<!-- SOUND -->
+<audio id="slurp" src="sluuuurp.mp3"></audio>
+
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// save system
+// SAVE
 let money = Number(localStorage.getItem("money") || 0);
 let milk = Number(localStorage.getItem("milk") || 5);
 
-document.getElementById("money").innerText = "$" + money;
+const moneyUI = document.getElementById("money");
 
+// SCENE
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight,0.1,1000);
 camera.position.z = 3;
@@ -73,8 +88,15 @@ const renderer = new THREE.WebGLRenderer({antialias:false});
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// background
-const bgTex = new THREE.TextureLoader().load("New Project (72).png");
+// LOADERS
+const texLoader = new THREE.TextureLoader();
+texLoader.setPath("./");
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.setPath("./");
+
+// BACKGROUND
+const bgTex = texLoader.load("New Project (72).png");
 const bg = new THREE.Mesh(
   new THREE.PlaneGeometry(4,4),
   new THREE.MeshBasicMaterial({map:bgTex})
@@ -82,13 +104,13 @@ const bg = new THREE.Mesh(
 bg.position.z = -1;
 scene.add(bg);
 
-// milk texture
-const tex = new THREE.TextureLoader().load("milk texture.png");
+// TEXTURE
+const tex = texLoader.load("milk texture.png");
 tex.flipY = false;
 
-// model
+// MODEL
 let milkModel;
-new GLTFLoader().load("milk.glb",(gltf)=>{
+gltfLoader.load("milk.glb",(gltf)=>{
   milkModel = gltf.scene;
 
   milkModel.traverse(c=>{
@@ -101,49 +123,87 @@ new GLTFLoader().load("milk.glb",(gltf)=>{
   scene.add(milkModel);
 });
 
-// health system
+// HEALTH
 let value = 50;
 let displayValue = 50;
 const fill = document.getElementById("fill");
 
-// drain
+// EFFECTS
+let clickTimer = 0;
+let shakePower = 0;
+
+// DRAIN
 setInterval(()=>{
   value -= 5;
   if(value < 0) value = 0;
 },3000);
 
-// click = drink milk
+// CLICK
 addEventListener("click",()=>{
-  if(!milk) return;
+  if(!milk || !milkModel) return;
 
-  if(milkModel){
-    value += 10;
-    if(value > 100) value = 100;
-    milk--;
-    localStorage.setItem("milk",milk);
-  }
+  value += 10;
+  if(value > 100) value = 100;
+
+  milk--;
+  localStorage.setItem("milk",milk);
+
+  // 🔊 SOUND
+  const s = document.getElementById("slurp");
+  s.currentTime = 0;
+  s.play();
+
+  // 🎈 EFFECTS
+  clickTimer = 1;
+  shakePower = 0.1;
 });
 
-// go to factory
+// FACTORY
 document.getElementById("arrow").onclick = ()=>{
   location.href = "factory.html";
 };
 
-// animate
+// ANIMATE
 function animate(){
   requestAnimationFrame(animate);
 
   if(milkModel){
+
+    // idle rotation
     milkModel.rotation.x += 0.005;
     milkModel.rotation.y += 0.007;
 
-    bg.position.x = Math.sin(Date.now()*0.001)*0.1;
-    bg.position.y = Math.cos(Date.now()*0.001)*0.1;
+    // 🎈 balloon squash
+    if(clickTimer > 0){
+      let s = 1 + Math.sin(clickTimer * 10) * 0.2;
+
+      milkModel.scale.set(
+        0.4 * (1 + s*0.2),
+        0.4 * (1 - s*0.1),
+        0.4 * (1 + s*0.2)
+      );
+
+      clickTimer -= 0.05;
+    } else {
+      milkModel.scale.set(0.4,0.4,0.4);
+    }
   }
 
-  // 🔥 smooth health
+  // 📳 SCREEN SHAKE
+  camera.position.x = (Math.random()-0.5) * shakePower;
+  camera.position.y = (Math.random()-0.5) * shakePower;
+  shakePower *= 0.9;
+
+  // 🌊 background sway
+  bg.position.x = Math.sin(Date.now()*0.001)*0.1;
+  bg.position.y = Math.cos(Date.now()*0.001)*0.1;
+
+  // 💚 smooth health
   displayValue += (value - displayValue) * 0.1;
   fill.style.width = displayValue + "%";
+
+  // 💰 update money always
+  moneyUI.innerText = "$" + money;
 
   renderer.render(scene,camera);
 }
