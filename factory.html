@@ -7,19 +7,25 @@
 <style>
 body {
   margin:0;
-  background:#111;
-  color:white;
-  font-family:sans-serif;
+  background: url("background.png");
+  background-size: cover;
+  background-position: center;
   overflow:hidden;
 }
 
-/* disable browser drag 🚫 */
-img {
-  -webkit-user-drag: none;
-  user-drag: none;
-  pointer-events:auto;
+/* FADE */
+#fade {
+  position:fixed;
+  width:100%;
+  height:100%;
+  background:black;
+  opacity:0;
+  pointer-events:none;
+  transition:0.4s;
+  z-index:999;
 }
 
+/* BACK */
 #back {
   position:absolute;
   left:20px;
@@ -31,54 +37,56 @@ img {
 /* ITEMS */
 .item {
   position:absolute;
-  width:100px;
+  width:130px;
   cursor:grab;
   user-select:none;
 }
 
 /* LEFT */
-#metal { left:80px; top:250px; }
-#wire { left:80px; top:250px; display:none; }
-#clip { left:80px; top:250px; display:none; }
-
-/* SMASH STACK */
-#smash1 {
-  position:absolute;
-  left:400px;
-  top:320px;
-  width:130px;
+#metal, #wire, #clip {
+  left:120px;
+  top:300px;
 }
+#wire, #clip { display:none; }
 
-#smash2 {
+/* SMASH */
+#smash1 {
+  left:500px;
+  top:380px;
+  width:180px;
   position:absolute;
-  left:400px;
-  top:180px;
-  width:130px;
+}
+#smash2 {
+  left:500px;
+  top:200px;
+  width:180px;
+  position:absolute;
 }
 
 /* BENDER */
 #bender {
+  left:800px;
+  top:300px;
+  width:200px;
   position:absolute;
-  left:650px;
-  top:250px;
-  width:150px;
 }
 
 /* SELL */
 #sell {
   position:absolute;
-  right:50px;
-  top:250px;
-  padding:20px;
+  right:80px;
+  top:300px;
+  padding:25px;
+  font-size:26px;
   background:green;
   cursor:pointer;
-  font-size:20px;
 }
 </style>
 </head>
 
 <body>
 
+<div id="fade"></div>
 <div id="back">⬅️</div>
 <div id="sell">SELL</div>
 
@@ -90,7 +98,6 @@ img {
 <img src="smash2.png" id="smash2">
 <img src="bender machine.png" id="bender">
 
-<!-- SOUNDS -->
 <audio id="smashSound" src="smash.mp3"></audio>
 <audio id="bendSound" src="bend.mp3"></audio>
 <audio id="sellSound" src="sell.mp3"></audio>
@@ -100,149 +107,17 @@ img {
 let money = Number(localStorage.getItem("money") || 0);
 let milk = Number(localStorage.getItem("milk") || 5);
 
-// DRAG SYSTEM (SMOOTH LERP)
-let current = null;
-
-let targetX = 0;
-let targetY = 0;
-
-let posX = 0;
-let posY = 0;
-
-document.querySelectorAll(".item").forEach(el=>{
-  el.draggable = false;
-
-  el.onmousedown = (e)=>{
-    current = el;
-
-    posX = el.offsetLeft;
-    posY = el.offsetTop;
-
-    targetX = e.pageX - el.offsetWidth/2;
-    targetY = e.pageY - el.offsetHeight/2;
-
-    el.style.cursor = "grabbing";
-  };
-});
-
-document.onmousemove = (e)=>{
-  if(current){
-    targetX = e.pageX - current.offsetWidth/2;
-    targetY = e.pageY - current.offsetHeight/2;
-  }
+// FADE BACK
+document.getElementById("back").onclick = ()=>{
+  document.getElementById("fade").style.opacity = 1;
+  setTimeout(()=> location.href="index.html",400);
 };
 
-document.onmouseup = ()=>{
-  if(!current) return;
-
-  current.style.cursor = "grab";
-
-  const smashZone = document.getElementById("smash1").getBoundingClientRect();
-  const benderZone = document.getElementById("bender").getBoundingClientRect();
-  const rect = current.getBoundingClientRect();
-
-  if(current.id === "metal" && overlap(rect, smashZone)){
-    smashMetal(current);
-  }
-  else if(current.id === "wire" && overlap(rect, benderZone)){
-    bendWire(current);
-  }
-
-  current = null;
-};
-
-// SMOOTH FOLLOW LOOP
-function dragUpdate(){
-  requestAnimationFrame(dragUpdate);
-
-  if(current){
-    posX += (targetX - posX) * 0.15;
-    posY += (targetY - posY) * 0.15;
-
-    current.style.left = posX + "px";
-    current.style.top = posY + "px";
-  }
-}
-dragUpdate();
-
-// COLLISION
-function overlap(a,b){
-  return a.left < b.right &&
-         a.right > b.left &&
-         a.top < b.bottom &&
-         a.bottom > b.top;
-}
-
-// 🔨 SMASH
-function smashMetal(el){
-  const smashSound = document.getElementById("smashSound");
-  smashSound.currentTime = 0;
-  smashSound.play();
-
-  const s1 = document.getElementById("smash1");
-  const s2 = document.getElementById("smash2");
-
-  el.style.transition = "all 0.2s";
-  el.style.left = "430px";
-  el.style.top = "260px";
-
-  setTimeout(()=>{
-    s1.style.transform = "translateY(-40px)";
-    s2.style.transform = "translateY(40px)";
-
-    setTimeout(()=>{
-      s1.style.transform = "translateY(0)";
-      s2.style.transform = "translateY(0)";
-    },150);
-
-    el.style.display = "none";
-
-    const wire = document.getElementById("wire");
-    wire.style.display = "block";
-    wire.style.left = "430px";
-    wire.style.top = "300px";
-
-  },200);
-}
-
-// 🔧 BENDER
-function bendWire(el){
-  const bendSound = document.getElementById("bendSound");
-  bendSound.currentTime = 0;
-  bendSound.play();
-
-  const bender = document.getElementById("bender");
-
-  el.style.transition = "all 0.2s";
-  el.style.left = "690px";
-  el.style.top = "280px";
-
-  setTimeout(()=>{
-    let i = 0;
-    let shake = setInterval(()=>{
-      bender.style.transform = `translateX(${Math.sin(i)*5}px)`;
-      i++;
-      if(i > 20){
-        clearInterval(shake);
-        bender.style.transform = "translateX(0)";
-      }
-    },20);
-
-    el.style.display = "none";
-
-    const clip = document.getElementById("clip");
-    clip.style.display = "block";
-    clip.style.left = "700px";
-    clip.style.top = "360px";
-
-  },200);
-}
-
-// 💰 SELL
+// SELL
 document.getElementById("sell").onclick = ()=>{
   let clip = document.getElementById("clip");
 
-  if(clip.style.display === "block"){
+  if(clip.style.display==="block"){
     document.getElementById("sellSound").play();
 
     money += 5;
@@ -251,18 +126,9 @@ document.getElementById("sell").onclick = ()=>{
     localStorage.setItem("money",money);
     localStorage.setItem("milk",milk);
 
-    clip.style.display = "none";
-
-    const metal = document.getElementById("metal");
-    metal.style.display = "block";
-    metal.style.left = "80px";
-    metal.style.top = "250px";
+    clip.style.display="none";
+    document.getElementById("metal").style.display="block";
   }
-};
-
-// BACK
-document.getElementById("back").onclick = ()=>{
-  location.href = "index.html";
 };
 </script>
 
