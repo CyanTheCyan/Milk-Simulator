@@ -5,25 +5,26 @@
 <title>Milk Game</title>
 
 <style>
-body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
+body { margin:0; overflow:hidden; background:#222; }
 
-/* 💰 MONEY UI */
+/* 💰 FONT */
 @font-face {
   font-family: comic;
-  src: url("COMIC.ttf");
+  src: url("./COMIC.ttf");
 }
 
+/* 💰 MONEY */
 #money {
   position:absolute;
   top:10px;
   left:10px;
   color:white;
-  font-family: comic;
-  font-size:40px;
+  font-family: comic, sans-serif;
+  font-size:48px;
   z-index:10;
 }
 
-/* HEALTH BAR */
+/* HEALTH */
 #bar {
   position:absolute;
   bottom:20px;
@@ -66,8 +67,7 @@ body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 <div id="bar"><div id="fill"></div></div>
 <div id="arrow">➡️</div>
 
-<!-- SOUND -->
-<audio id="slurp" src="sluuuurp.mp3"></audio>
+<audio id="slurp" src="./sluuuurp.mp3"></audio>
 
 <script type="module">
 import * as THREE from "three";
@@ -138,24 +138,39 @@ setInterval(()=>{
   if(value < 0) value = 0;
 },3000);
 
-// CLICK
-addEventListener("click",()=>{
-  if(!milk || !milkModel) return;
+// 🔥 CLICK DETECTION (RAYCAST)
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
-  value += 10;
-  if(value > 100) value = 100;
+addEventListener("click",(event)=>{
 
-  milk--;
-  localStorage.setItem("milk",milk);
+  if(!milkModel) return;
 
-  // 🔊 SOUND
-  const s = document.getElementById("slurp");
-  s.currentTime = 0;
-  s.play();
+  mouse.x = (event.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
 
-  // 🎈 EFFECTS
-  clickTimer = 1;
-  shakePower = 0.1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersects = raycaster.intersectObject(milkModel, true);
+
+  if(intersects.length > 0 && milk > 0){
+
+    value += 10;
+    if(value > 100) value = 100;
+
+    milk--;
+    localStorage.setItem("milk",milk);
+
+    // 🔊 SOUND (force replay)
+    const s = document.getElementById("slurp");
+    s.pause();
+    s.currentTime = 0;
+    s.play();
+
+    // 💥 STRONGER EFFECTS
+    clickTimer = 1.5;
+    shakePower = 0.2;
+  }
 });
 
 // FACTORY
@@ -169,18 +184,17 @@ function animate(){
 
   if(milkModel){
 
-    // idle rotation
     milkModel.rotation.x += 0.005;
     milkModel.rotation.y += 0.007;
 
-    // 🎈 balloon squash
+    // 🎈 BALLOON EFFECT (VISIBLE NOW)
     if(clickTimer > 0){
-      let s = 1 + Math.sin(clickTimer * 10) * 0.2;
+      let s = Math.sin(clickTimer * 8);
 
       milkModel.scale.set(
-        0.4 * (1 + s*0.2),
-        0.4 * (1 - s*0.1),
-        0.4 * (1 + s*0.2)
+        0.4 + s * 0.15,
+        0.4 - s * 0.1,
+        0.4 + s * 0.15
       );
 
       clickTimer -= 0.05;
@@ -189,20 +203,17 @@ function animate(){
     }
   }
 
-  // 📳 SCREEN SHAKE
+  // 📳 SHAKE
   camera.position.x = (Math.random()-0.5) * shakePower;
   camera.position.y = (Math.random()-0.5) * shakePower;
   shakePower *= 0.9;
 
-  // 🌊 background sway
-  bg.position.x = Math.sin(Date.now()*0.001)*0.1;
-  bg.position.y = Math.cos(Date.now()*0.001)*0.1;
-
-  // 💚 smooth health
+  // 💚 HEALTH SMOOTH
   displayValue += (value - displayValue) * 0.1;
   fill.style.width = displayValue + "%";
 
-  // 💰 update money always
+  // 💰 UPDATE MONEY ALWAYS
+  money = Number(localStorage.getItem("money") || 0);
   moneyUI.innerText = "$" + money;
 
   renderer.render(scene,camera);
