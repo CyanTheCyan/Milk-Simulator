@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Milk Game</title>
+
+<style>
+body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
+
+#bar {
+  position:absolute;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  width:300px;
+  height:25px;
+  background:red;
+}
+#fill {
+  height:100%;
+  width:0%;
+  background:lime;
+  transition: width 0.1s linear; /* extra smoothness */
+}
+
+#arrow {
+  position:absolute;
+  right:20px;
+  top:50%;
+  font-size:40px;
+  cursor:pointer;
+}
+
+#money {
+  position:absolute;
+  top:10px;
+  left:10px;
+  color:white;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<div id="money">$0</div>
+<div id="bar"><div id="fill"></div></div>
+<div id="arrow">➡️</div>
+
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// save system
+let money = Number(localStorage.getItem("money") || 0);
+let milk = Number(localStorage.getItem("milk") || 5);
+
+document.getElementById("money").innerText = "$" + money;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight,0.1,1000);
+camera.position.z = 3;
+
+const renderer = new THREE.WebGLRenderer({antialias:false});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// background
+const bgTex = new THREE.TextureLoader().load("New Project (72).png");
+const bg = new THREE.Mesh(
+  new THREE.PlaneGeometry(4,4),
+  new THREE.MeshBasicMaterial({map:bgTex})
+);
+bg.position.z = -1;
+scene.add(bg);
+
+// milk texture
+const tex = new THREE.TextureLoader().load("milk texture.png");
+tex.flipY = false;
+
+// model
+let milkModel;
+new GLTFLoader().load("milk.glb",(gltf)=>{
+  milkModel = gltf.scene;
+
+  milkModel.traverse(c=>{
+    if(c.isMesh){
+      c.material = new THREE.MeshBasicMaterial({map:tex});
+    }
+  });
+
+  milkModel.scale.set(0.4,0.4,0.4);
+  scene.add(milkModel);
+});
+
+// health system
+let value = 50;
+let displayValue = 50;
+const fill = document.getElementById("fill");
+
+// drain
+setInterval(()=>{
+  value -= 5;
+  if(value < 0) value = 0;
+},3000);
+
+// click = drink milk
+addEventListener("click",()=>{
+  if(!milk) return;
+
+  if(milkModel){
+    value += 10;
+    if(value > 100) value = 100;
+    milk--;
+    localStorage.setItem("milk",milk);
+  }
+});
+
+// go to factory
+document.getElementById("arrow").onclick = ()=>{
+  location.href = "factory.html";
+};
+
+// animate
+function animate(){
+  requestAnimationFrame(animate);
+
+  if(milkModel){
+    milkModel.rotation.x += 0.005;
+    milkModel.rotation.y += 0.007;
+
+    bg.position.x = Math.sin(Date.now()*0.001)*0.1;
+    bg.position.y = Math.cos(Date.now()*0.001)*0.1;
+  }
+
+  // 🔥 smooth health
+  displayValue += (value - displayValue) * 0.1;
+  fill.style.width = displayValue + "%";
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+
+</body>
+</html>
