@@ -1,253 +1,37 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Milk Game</title>
-
-<style>
-body { margin:0; overflow:hidden; background:#222; }
-
-/* FONT */
-@font-face {
-  font-family: comic;
-  src: url("./COMIC.ttf");
-}
-
-/* MONEY */
-#money {
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
-  font-family: comic, sans-serif;
-  font-size:48px;
-  z-index:10;
-}
-
-/* HEALTH */
-#bar {
-  position:absolute;
-  bottom:20px;
-  left:50%;
-  transform:translateX(-50%);
-  width:300px;
-  height:25px;
-  background:red;
-}
-#fill {
-  height:100%;
-  width:0%;
-  background:lime;
-}
-
-/* ARROW */
-#arrow {
-  position:absolute;
-  right:20px;
-  top:50%;
-  font-size:40px;
-  cursor:pointer;
-  z-index:10;
-}
-
-/* FADE */
-#fade {
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:black;
-  opacity:0;
-  pointer-events:none;
-  transition: opacity 0.4s;
-  z-index:999;
-}
-</style>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/"
-  }
-}
-</script>
-</head>
-
-<body>
-
-<div id="money">$0</div>
-<div id="bar"><div id="fill"></div></div>
-<div id="arrow">➡️</div>
-<div id="fade"></div>
-
-<audio id="slurp" src="./sluuuurp.mp3"></audio>
-
-<script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-
-// SAVE
-let money = Number(localStorage.getItem("money") || 0);
-let milk = Number(localStorage.getItem("milk") || 5);
-
-const moneyUI = document.getElementById("money");
-
-// SCENE
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight,0.1,1000);
-camera.position.z = 3;
-
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
-
-// LOADERS
-const texLoader = new THREE.TextureLoader();
-texLoader.setPath("./");
-
-const gltfLoader = new GLTFLoader();
-gltfLoader.setPath("./");
-
-// BACKGROUND
-const bgTex = texLoader.load("New Project (72).png");
-const bg = new THREE.Mesh(
-  new THREE.PlaneGeometry(4,4),
-  new THREE.MeshBasicMaterial({map:bgTex})
-);
-bg.position.z = -1;
-scene.add(bg);
-
-// TEXTURE
-const tex = texLoader.load("milk texture.png");
-tex.flipY = false;
-
-// MODEL + OUTLINE
 let milkModel;
 
 gltfLoader.load("milk.glb",(gltf)=>{
   milkModel = gltf.scene;
 
-  milkModel.traverse(c=>{
-    if(c.isMesh){
-      c.material = new THREE.MeshBasicMaterial({map:tex});
-    }
-  });
-
-  // WHITE outline
-  const white = milkModel.clone(true);
-  white.traverse(c=>{
-    if(c.isMesh){
-      c.material = new THREE.MeshBasicMaterial({color:0xffffff});
-    }
-  });
-  white.scale.multiplyScalar(1.15);
-
-  // BLACK outline
-  const black = milkModel.clone(true);
-  black.traverse(c=>{
-    if(c.isMesh){
-      c.material = new THREE.MeshBasicMaterial({color:0x000000});
-    }
-  });
-  black.scale.multiplyScalar(1.25);
-
   milkModel.scale.set(0.4,0.4,0.4);
 
-  scene.add(black);
-  scene.add(white);
+  milkModel.traverse(c=>{
+    if(c.isMesh){
+
+      // ORIGINAL MATERIAL
+      c.material = new THREE.MeshBasicMaterial({map:tex});
+
+      // ⚫ BLACK OUTLINE (outer)
+      const blackMat = new THREE.MeshBasicMaterial({
+        color:0x000000,
+        side:THREE.BackSide
+      });
+
+      const blackMesh = new THREE.Mesh(c.geometry, blackMat);
+      blackMesh.scale.set(1.25,1.25,1.25);
+      c.add(blackMesh);
+
+      // ⚪ WHITE OUTLINE (inner)
+      const whiteMat = new THREE.MeshBasicMaterial({
+        color:0xffffff,
+        side:THREE.BackSide
+      });
+
+      const whiteMesh = new THREE.Mesh(c.geometry, whiteMat);
+      whiteMesh.scale.set(1.15,1.15,1.15);
+      c.add(whiteMesh);
+    }
+  });
+
   scene.add(milkModel);
 });
-
-// HEALTH
-let value = 50;
-let displayValue = 50;
-const fill = document.getElementById("fill");
-
-// EFFECTS
-let clickTimer = 0;
-let shakePower = 0;
-
-// DRAIN
-setInterval(()=>{
-  value -= 5;
-  if(value < 0) value = 0;
-},3000);
-
-// CLICK (RAYCAST)
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-addEventListener("click",(event)=>{
-  if(!milkModel) return;
-
-  mouse.x = (event.clientX / innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-  const hit = raycaster.intersectObject(milkModel,true);
-
-  if(hit.length > 0 && milk > 0){
-    value = Math.min(100, value + 10);
-    milk--;
-
-    localStorage.setItem("milk",milk);
-
-    const s = document.getElementById("slurp");
-    s.currentTime = 0;
-    s.play();
-
-    clickTimer = 1.5;
-    shakePower = 0.2;
-  }
-});
-
-// GO FACTORY (fade)
-document.getElementById("arrow").onclick = ()=>{
-  const fade = document.getElementById("fade");
-  fade.style.opacity = 1;
-
-  setTimeout(()=>{
-    location.href = "factory.html";
-  },400);
-};
-
-// LOOP
-function animate(){
-  requestAnimationFrame(animate);
-
-  if(milkModel){
-    milkModel.rotation.x += 0.005;
-    milkModel.rotation.y += 0.007;
-
-    if(clickTimer > 0){
-      let s = Math.sin(clickTimer * 8);
-      milkModel.scale.set(
-        0.4 + s*0.15,
-        0.4 - s*0.1,
-        0.4 + s*0.15
-      );
-      clickTimer -= 0.05;
-    } else {
-      milkModel.scale.set(0.4,0.4,0.4);
-    }
-  }
-
-  camera.position.x = (Math.random()-0.5)*shakePower;
-  camera.position.y = (Math.random()-0.5)*shakePower;
-  shakePower *= 0.9;
-
-  displayValue += (value - displayValue)*0.1;
-  fill.style.width = displayValue + "%";
-
-  money = Number(localStorage.getItem("money") || 0);
-  moneyUI.innerText = "$" + money;
-
-  renderer.render(scene,camera);
-}
-animate();
-</script>
-
-</body>
-</html>
