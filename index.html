@@ -7,13 +7,11 @@
 <style>
 body { margin:0; overflow:hidden; background:#222; }
 
-/* FONT */
 @font-face {
   font-family: comic;
   src: url("./COMIC.ttf");
 }
 
-/* MONEY */
 #money {
   position:absolute;
   top:10px;
@@ -24,7 +22,6 @@ body { margin:0; overflow:hidden; background:#222; }
   z-index:10;
 }
 
-/* HEALTH */
 #bar {
   position:absolute;
   bottom:20px;
@@ -40,7 +37,6 @@ body { margin:0; overflow:hidden; background:#222; }
   background:lime;
 }
 
-/* BUTTON */
 #arrow {
   position:absolute;
   right:20px;
@@ -50,17 +46,14 @@ body { margin:0; overflow:hidden; background:#222; }
   z-index:10;
 }
 
-/* FADE */
 #fade {
   position:fixed;
-  top:0;
-  left:0;
   width:100%;
   height:100%;
   background:black;
   opacity:0;
   pointer-events:none;
-  transition: opacity 0.4s;
+  transition:0.4s;
   z-index:999;
 }
 </style>
@@ -123,7 +116,7 @@ scene.add(bg);
 const tex = texLoader.load("milk texture.png");
 tex.flipY = false;
 
-// MODEL (FIXED OUTLINE)
+// MODEL
 let milkModel;
 
 gltfLoader.load("milk.glb",(gltf)=>{
@@ -134,26 +127,34 @@ gltfLoader.load("milk.glb",(gltf)=>{
   milkModel.traverse(c=>{
     if(c.isMesh){
 
-      // main texture
+      // MAIN MATERIAL
       c.material = new THREE.MeshBasicMaterial({map:tex});
 
       // ⚫ BLACK OUTLINE
-      const blackMat = new THREE.MeshBasicMaterial({
-        color:0x000000,
-        side:THREE.BackSide
-      });
-      const blackMesh = new THREE.Mesh(c.geometry, blackMat);
-      blackMesh.scale.set(1.25,1.25,1.25);
-      c.add(blackMesh);
+      const black = new THREE.Mesh(
+        c.geometry,
+        new THREE.MeshBasicMaterial({
+          color:0x000000,
+          side:THREE.BackSide,
+          depthWrite:false
+        })
+      );
+      black.scale.set(1.25,1.25,1.25);
+      black.renderOrder = -2;
+      c.add(black);
 
       // ⚪ WHITE OUTLINE
-      const whiteMat = new THREE.MeshBasicMaterial({
-        color:0xffffff,
-        side:THREE.BackSide
-      });
-      const whiteMesh = new THREE.Mesh(c.geometry, whiteMat);
-      whiteMesh.scale.set(1.15,1.15,1.15);
-      c.add(whiteMesh);
+      const white = new THREE.Mesh(
+        c.geometry,
+        new THREE.MeshBasicMaterial({
+          color:0xffffff,
+          side:THREE.BackSide,
+          depthWrite:false
+        })
+      );
+      white.scale.set(1.15,1.15,1.15);
+      white.renderOrder = -1;
+      c.add(white);
     }
   });
 
@@ -171,19 +172,18 @@ let shakePower = 0;
 
 // DRAIN
 setInterval(()=>{
-  value -= 5;
-  if(value < 0) value = 0;
+  value = Math.max(0, value - 5);
 },3000);
 
-// CLICK (ONLY WHEN HITTING MILK)
+// CLICK
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 addEventListener("click",(event)=>{
   if(!milkModel) return;
 
-  mouse.x = (event.clientX / innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+  mouse.x = (event.clientX / innerWidth)*2 - 1;
+  mouse.y = -(event.clientY / innerHeight)*2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
   const hit = raycaster.intersectObject(milkModel,true);
@@ -195,12 +195,10 @@ addEventListener("click",(event)=>{
 
     localStorage.setItem("milk",milk);
 
-    // SOUND
     const s = document.getElementById("slurp");
     s.currentTime = 0;
     s.play();
 
-    // EFFECTS
     clickTimer = 1.5;
     shakePower = 0.2;
   }
@@ -208,12 +206,8 @@ addEventListener("click",(event)=>{
 
 // TRANSITION
 document.getElementById("arrow").onclick = ()=>{
-  const fade = document.getElementById("fade");
-  fade.style.opacity = 1;
-
-  setTimeout(()=>{
-    location.href = "factory.html";
-  },400);
+  document.getElementById("fade").style.opacity = 1;
+  setTimeout(()=> location.href="factory.html",400);
 };
 
 // LOOP
@@ -221,6 +215,7 @@ function animate(){
   requestAnimationFrame(animate);
 
   if(milkModel){
+
     milkModel.rotation.x += 0.005;
     milkModel.rotation.y += 0.007;
 
